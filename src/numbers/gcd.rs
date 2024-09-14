@@ -26,7 +26,7 @@ pub fn gcd_using_prime_factors(u: usize, v: usize) -> i32{
 }
 
 /// Returns the greatest common divisor of u and v
-/// The gcd is computed using euclids algorithm
+/// The gcd is computed using euclid's algorithm
 pub fn gcd_euclid(u: usize, v: usize) -> i32 {
     let mut u = u;
     let mut v = v;
