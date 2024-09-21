@@ -1,9 +1,11 @@
+/// A Stack implementation that uses a vec for holding its elements
 pub struct ArrayStack<T> {
     array: Vec<T>,
     stack_pointer: usize,
 }
 
 impl<T> ArrayStack<T> {
+    /// Creates a new ArrayStack
     pub fn new() -> Self {
         ArrayStack {
             array: Vec::new(),
@@ -11,6 +13,7 @@ impl<T> ArrayStack<T> {
         }
     }
 
+    /// Pushes a new value onto the stack
     pub fn push(&mut self, val: T) {
         if self.array.len() > self.stack_pointer {
             self.array[self.stack_pointer] = val;
@@ -20,6 +23,7 @@ impl<T> ArrayStack<T> {
         self.stack_pointer += 1;
     }
 
+    /// If the stack is not empty, the top element is removed and returned, otherwise None is returned
     pub fn pop(&mut self) -> Option<T> {
         if self.is_empty() {
             return None;
@@ -29,6 +33,7 @@ impl<T> ArrayStack<T> {
         Some(self.array.remove(self.stack_pointer))
     }
 
+    /// returns true iff the stack is empty
     pub fn is_empty(&self) -> bool {
         self.stack_pointer == 0
     }
