@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 
-#[derive(Debug)]
 struct BinarySearchTreeNode<T: PartialOrd> {
     value: T,
     left: Option<Box<BinarySearchTreeNode<T>>>,
