@@ -1,2 +1,2 @@
 pub mod simple_sort;
-mod mergesort;
+pub mod mergesort;

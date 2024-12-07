@@ -42,11 +42,10 @@ fn mergesort_internal<T: PartialOrd>(
 
 #[test]
 pub fn mergesort_test() {
-    let start = [1, 5, 7, 3, 2, 4, 9, 10, 8, 6];
+    let mut start = [1, 5, 7, 3, 2, 4, 9, 10, 8, 6];
     let mut goal = start.clone();
     goal.sort();
 
-    let mut array = start.clone();
-    mergesort(&mut array);
-    assert_eq!(array, goal);
+    mergesort(&mut start);
+    assert_eq!(start, goal);
 }

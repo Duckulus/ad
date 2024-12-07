@@ -4,3 +4,5 @@ pub mod expression;
 pub mod hash;
 pub mod tree;
 pub mod sort;
+
+pub mod heap;
