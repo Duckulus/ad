@@ -6,3 +6,4 @@ pub mod tree;
 pub mod sort;
 pub mod heap;
 pub mod string_matching;
+pub mod crypto;
