@@ -1,3 +1,6 @@
+use std::cmp::{max, min};
+use std::fmt::{Display, Formatter};
+
 static RADIX: u32 = 10;
 
 #[derive(Debug)]
@@ -5,7 +8,7 @@ pub enum BigIntegerError {
     ParseError,
 }
 
-/// Represents an integer of arbitrary size
+/// Represents an immutable integer of arbitrary size
 #[derive(Debug, Clone)]
 pub struct BigInteger {
     digits: Vec<u8>,
@@ -18,6 +21,8 @@ static ZERO: BigInteger = BigInteger {
 };
 
 impl BigInteger {
+    /// returns the BigInteger represented by this string
+    /// throws an error if the string does not represent a valid integer
     pub fn from_str(value: &str) -> Result<Self, BigIntegerError> {
         if value.len() == 0 {
             return Ok(ZERO.clone());
@@ -42,6 +47,12 @@ impl BigInteger {
         Ok(Self { digits, neg })
     }
 
+    /// returns the BigInteger that is equal in value to the passed int
+    pub fn from_int(value: i32) -> Self {
+        Self::from_str(value.to_string().as_str()).unwrap()
+    }
+
+    /// returns a new BigInteger with the same magnitude and the specified sign
     pub fn with_sign(&self, neg: bool) -> Self {
         Self {
             digits: self.digits.clone(),
@@ -49,19 +60,38 @@ impl BigInteger {
         }
     }
 
+    /// returns a new BigInteger with the same magnitude and the opposite sign
     pub fn negate(&self) -> Self {
         self.with_sign(!self.neg)
     }
 
+    /// returns a new BigInteger with the same magnitude and a positive sign
     pub fn as_positive(&self) -> Self {
         self.with_sign(false)
     }
 
+    /// returns a new BigInteger with the same magnitude and a negative sign
     pub fn as_negative(&self) -> Self {
         self.with_sign(true)
     }
 
+    pub fn is_negative(&self) -> bool {
+        self.digits.len() > 0 && self.neg
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.digits.len() == 0
+    }
+
+    /// returns true if this BigInteger represents a larger number than other
     pub fn greater_than(&self, other: &Self) -> bool {
+        if self.is_negative() && other.is_negative() {
+            return other.as_positive().greater_than(&self.as_positive());
+        } else if self.is_negative() && !other.is_negative() {
+            return false;
+        } else if other.is_negative() && !self.is_negative() {
+            return true;
+        }
         if self.digits.len() > other.digits.len() {
             return true;
         } else if other.digits.len() > self.digits.len() {
@@ -77,8 +107,12 @@ impl BigInteger {
         false
     }
 
+    /// returns true if this BigInteger represents a larger number than other
     pub fn equals(&self, other: &Self) -> bool {
         if self.digits.len() != other.digits.len() {
+            return false;
+        }
+        if self.digits.len() != 0 && self.neg != other.neg {
             return false;
         }
         for i in (0..self.digits.len()).rev() {
@@ -89,12 +123,23 @@ impl BigInteger {
         true
     }
 
+    /// shifts the decimal representation of this BigInteger to the left by n digits
+    /// the effect is the same as multiplying it by 10^n
+    pub fn shift_left(&self, n: usize) -> Self {
+        let mut digits = vec![0; n];
+        digits.extend(self.digits.clone());
+        Self {
+            digits,
+            neg: self.neg,
+        }
+    }
+
     pub fn add(&self, other: &Self) -> Self {
-        if self.neg && other.neg {
+        if self.is_negative() && other.is_negative() {
             return self.as_positive().add(&other.as_positive()).as_negative();
-        } else if self.neg && !other.neg {
+        } else if self.is_negative() && !other.is_negative() {
             return other.sub(&self.as_positive());
-        } else if other.neg && !self.neg {
+        } else if other.is_negative() && !self.is_negative() {
             return self.sub(&other.as_positive());
         }
 
@@ -130,11 +175,11 @@ impl BigInteger {
     }
 
     pub fn sub(&self, other: &Self) -> Self {
-        if self.neg && other.neg {
+        if self.is_negative() && other.is_negative() {
             return self.add(&other.as_positive());
-        } else if self.neg && !other.neg {
+        } else if self.is_negative() && !other.is_negative() {
             return self.as_positive().add(other).as_negative();
-        } else if !self.neg && other.neg {
+        } else if !self.is_negative() && other.is_negative() {
             return self.add(&other.as_positive());
         }
 
@@ -169,7 +214,7 @@ impl BigInteger {
             diff_digits.push(carry);
         }
 
-        while !diff_digits.is_empty() && diff_digits[diff_digits.len()-1] == 0 {
+        while !diff_digits.is_empty() && diff_digits[diff_digits.len() - 1] == 0 {
             diff_digits.pop();
         }
 
@@ -177,6 +222,87 @@ impl BigInteger {
             digits: diff_digits,
             neg,
         }
+    }
+
+    /// multiplies 2 BigIntegers by using Karatsuba Multiplication
+    pub fn mul(&self, other: &BigInteger) -> Self {
+        if self.neg != other.neg {
+            return self.as_positive().mul(&other.as_positive()).as_negative();
+        }
+        let a = self.as_positive();
+        let b = other.as_positive();
+        if a.is_zero() || b.is_zero() {
+            return ZERO.clone();
+        }
+        if a.digits.len() == 1 && b.digits.len() == 1 {
+            return Self::from_int(a.digits[0] as i32 * b.digits[0] as i32);
+        }
+
+        let mut a_digits = a.digits.clone();
+        let a_len = a_digits.len();
+        let mut b_digits = b.digits.clone();
+        let b_len = b_digits.len();
+
+        let len = max(a.digits.len(), b.digits.len());
+        let half_len = len / 2;
+
+        let ah_digits = a_digits[min(half_len, a_len)..min(len, a_len)].to_vec();
+        let ah = Self {
+            digits: ah_digits,
+            neg: false,
+        };
+        let al_digits = a_digits[0..min(a_len, half_len)].to_vec();
+        let al = Self {
+            digits: al_digits,
+            neg: false,
+        };
+        let bh_digits = b_digits[min(half_len, b_len)..min(len, b_len)].to_vec();
+        let bh = Self {
+            digits: bh_digits,
+            neg: false,
+        };
+        let bl_digits = b_digits[0..min(b_len, half_len)].to_vec();
+        let bl = Self {
+            digits: bl_digits,
+            neg: false,
+        };
+
+        let h = ah.mul(&bh);
+        let l = al.mul(&bl);
+        let m = ah.sub(&al).mul(&bl.sub(&bh));
+
+        let result = h
+            .shift_left(2 * half_len)
+            .add(&m.add(&h).add(&l).shift_left(half_len))
+            .add(&l);
+
+        let mut d = result.digits.clone();
+        let mut i = d.len() - 1;
+        while i > 0 && d[i] == 0 {
+            d.pop();
+            i-=1;
+        }
+
+        Self {
+            digits: d,
+            neg: false
+        }
+    }
+}
+
+impl Display for BigInteger {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}",
+            if self.neg { "-" } else { "" },
+            self.digits
+                .iter()
+                .rev()
+                .map(|i| i.to_string())
+                .collect::<Vec<_>>()
+                .join("")
+        )
     }
 }
 
@@ -186,14 +312,17 @@ pub fn add_test() {
     let b = BigInteger::from_str("112").unwrap();
     let c = BigInteger::from_str("154").unwrap();
     assert!(a.add(&b).equals(&c));
+
     let a = BigInteger::from_str("13").unwrap();
     let b = BigInteger::from_str("-6").unwrap();
     let c = BigInteger::from_str("7").unwrap();
     assert!(a.add(&b).equals(&c));
+
     let a = BigInteger::from_str("-6").unwrap();
     let b = BigInteger::from_str("13").unwrap();
     let c = BigInteger::from_str("7").unwrap();
     assert!(a.add(&b).equals(&c));
+
     let a = BigInteger::from_str("-326").unwrap();
     let b = BigInteger::from_str("-4830").unwrap();
     let c = BigInteger::from_str("-5156").unwrap();
@@ -206,24 +335,67 @@ pub fn sub_test() {
     let b = BigInteger::from_str("83").unwrap();
     let c = BigInteger::from_str("529").unwrap();
     assert!(a.sub(&b).equals(&c));
+
     let a = BigInteger::from_str("83").unwrap();
     let b = BigInteger::from_str("612").unwrap();
     let c = BigInteger::from_str("-529").unwrap();
     assert!(a.sub(&b).equals(&c));
+
     let a = BigInteger::from_str("612").unwrap();
     let b = BigInteger::from_str("-83").unwrap();
     let c = BigInteger::from_str("695").unwrap();
     assert!(a.sub(&b).equals(&c));
+
     let a = BigInteger::from_str("-612").unwrap();
     let b = BigInteger::from_str("83").unwrap();
     let c = BigInteger::from_str("-695").unwrap();
     assert!(a.sub(&b).equals(&c));
+
     let a = BigInteger::from_str("-612").unwrap();
     let b = BigInteger::from_str("-83").unwrap();
     let c = BigInteger::from_str("-529").unwrap();
     assert!(a.sub(&b).equals(&c));
+
     let a = BigInteger::from_str("-83").unwrap();
     let b = BigInteger::from_str("-612").unwrap();
     let c = BigInteger::from_str("529").unwrap();
     assert!(a.sub(&b).equals(&c));
+}
+
+#[test]
+pub fn mul_test() {
+    let a = BigInteger::from_str("4725").unwrap();
+    let b = BigInteger::from_str("9393").unwrap();
+    let c = BigInteger::from_int(4725 * 9393);
+    assert!(a.mul(&b).equals(&c));
+
+    let a = BigInteger::from_str("4725").unwrap();
+    let b = BigInteger::from_str("939").unwrap();
+    let c = BigInteger::from_int(4725 * 939);
+    assert!(a.mul(&b).equals(&c));
+
+    let a = BigInteger::from_str("472").unwrap();
+    let b = BigInteger::from_str("9").unwrap();
+    let c = BigInteger::from_int(472 * 9);
+    assert!(a.mul(&b).equals(&c));
+
+    let a = BigInteger::from_str("472").unwrap();
+    let b = BigInteger::from_str("-9").unwrap();
+    let c = BigInteger::from_int(472 * -9);
+    assert!(a.mul(&b).equals(&c));
+
+    let a = BigInteger::from_str("472").unwrap();
+    let b = BigInteger::from_str("-9").unwrap();
+    let c = BigInteger::from_int(472 * -9);
+    assert!(a.mul(&b).equals(&c));
+
+    let a = BigInteger::from_str("-472").unwrap();
+    let b = BigInteger::from_str("9").unwrap();
+    let c = BigInteger::from_int(-472 * 9);
+    assert!(a.mul(&b).equals(&c));
+
+    let a = BigInteger::from_str("-472").unwrap();
+    let b = BigInteger::from_str("-9").unwrap();
+    let c = BigInteger::from_int(-472 * -9);
+    assert!(a.mul(&b).equals(&c));
 }
